@@ -15,11 +15,17 @@
             const SHIP_SIZE = 30; //Ship height in pixels
             const SHIP_THRUST = 3; //acceleration of the ship in pixels per second per second
             const TURN_SPEED = 360; //Turn speed in deg per sec 
+            const ASTEROID_NUM = 10; //Starting asteroid count
+            const ASTEROID_SPEED = 50; //max starting speed of asteroid in px per sec
+            const ASTEROID_SIZE = 100; //Starting size of asteroid in px
+            const ASTEROID_VERT = 10 //average number of vertices on each asteroids
+            const ASTEROID_JAG = 0.25 //jaggedness of the asteroid (0 = none, 1 = very jagged)
 
             /** @type {HTMLCanvasElement} */
             let canv = document.getElementById('gameCanvas');
             let ctx = canv.getContext("2d");
 
+            //Set up the spaceship object
             let ship = {
                 x: canv.width / 2,
                 y: canv.height / 2,
@@ -34,12 +40,33 @@
 
             }
 
+            //set up asteroids
+            let asteroids = [];
+            createAsteroidBelt();
+
             //Set up event handlers
             document.addEventListener("keydown", keyDown);
             document.addEventListener("keyup", keyUp);
 
             //Set up game loop
             setInterval(update, 1000 / FPS)
+
+            function createAsteroidBelt() {
+                asteroids = [];
+                let x, y;
+                for (let i = 0; i < ASTEROID_NUM; i++) {
+                    do {
+                        x = Math.floor(Math.random() * canv.width);
+                        y = Math.floor(Math.random() * canv.height);
+                    } while (distBetweenPoints(ship.x, ship.y, x, y) < ASTEROID_SIZE * 2 + ship.r)
+
+                    asteroids.push(newAsteroid(x, y))
+                }
+            }
+
+            function distBetweenPoints(x1, y1, x2, y2) {
+                return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            }
 
             function keyDown(/** @type {keyboardEvent}*/ ev) {
                 switch (ev.keyCode) {
@@ -67,6 +94,25 @@
                         ship.rot = 0;
                         break;
                 }
+            }
+
+            function newAsteroid(x, y) {
+                let asteroid = {
+                    x: x,
+                    y: y,
+                    xv: Math.random() * ASTEROID_SPEED / FPS * (Math.random() < 0.5 ? 1 : -1),
+                    yv: Math.random() * ASTEROID_SPEED / FPS * (Math.random() < 0.5 ? 1 : -1),
+                    r: ASTEROID_SIZE / 2,
+                    a: Math.random() * Math.PI * 2, // in rad
+                    vert: Math.floor(Math.random() * (ASTEROID_VERT + 1) + ASTEROID_VERT / 2),
+                    offs: []
+                }
+
+                //create the vertext offset array
+                for (let i = 0; i < asteroid.vert; i++) {
+                    asteroid.offs.push(Math.random() * ASTEROID_JAG * 2 + 1 - ASTEROID_JAG)
+                }
+                return asteroid;
             }
 
             function update() {
@@ -131,6 +177,53 @@
 
                 ctx.closePath();
                 ctx.stroke();
+
+                //draw the asteroids
+                ctx.strokeStyle = 'slategrey';
+                ctx.lineWidth = SHIP_SIZE / 20;
+                let x, y, r, a, vert, offs;
+                for (let i = 0; i < asteroids.length; i++) {
+                    //get the asteroid properties
+                    x = asteroids[i].x;
+                    y = asteroids[i].y;
+                    r = asteroids[i].r;
+                    a = asteroids[i].a;
+                    vert = asteroids[i].vert;
+                    offs = asteroids[i].offs;
+
+                    //draw a path
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        x + r * offs[0] * Math.cos(a),
+                        y + r * offs[0] * Math.sin(a)
+                    )
+
+                    //draw the polygon
+                    for (let j = 1; j < vert; j++) {
+                        ctx.lineTo(
+                            x + r * offs[j] * Math.cos(a + j * Math.PI * 2 / vert),
+                            y + r * offs[j] * Math.sin(a + j * Math.PI * 2 / vert)
+                        );
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    //move the asteroid
+                    asteroids[i].x += asteroids[i].xv;
+                    asteroids[i].y += asteroids[i].yv;
+
+                    //handle edge of screen
+                    if (asteroids[i].x < 0 - asteroids[i].r) {
+                        asteroids[i].x = canv.width + asteroids[i].r;
+                    } else if (asteroids[i].x > canv.width + asteroids[i].r) {
+                        asteroids[i].x = 0 - asteroids[i].r
+                    }
+                    if (asteroids[i].y < 0 - asteroids[i].r) {
+                        asteroids[i].y = canv.height + asteroids[i].r;
+                    } else if (asteroids[i].y > canv.height + asteroids[i].r) {
+                        asteroids[i].y = 0 - asteroids[i].r
+                    }
+                }
 
                 //rotate ship
                 ship.a += ship.rot;
